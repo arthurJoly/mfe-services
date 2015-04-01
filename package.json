@@ -1,0 +1,29 @@
+{
+  "name": "webservices-test",
+  "version": "0.0.0",
+  "private": true,
+  "repository": {
+		"type": "git",
+		"url": "https://github.com/arthurJoly/mylaforexperts-services.git"
+  },
+  "dependencies": {
+		"body-parser": "^1.9.3",
+		"bunyan": "^1.2.3",
+		"cookie-parser": "^1.3.3",
+		"ent": "^2.0.0",
+		"express": "^4.4.5",
+		"express-session": "^1.9.3",
+		"mongoose": "^3.8.21",
+		"node-uuid": "^1.4.2",
+		"node-gcm": "^0.9.15",
+		"hashmap": "^2.0.1",
+		"ws": "0.4.x",
+		"owl-deepcopy": "~0.0.1"
+	},
+	"engines": {
+		"node": "0.10.x"
+	},
+	"scripts": {
+		"start": "node app.js | bunyan"
+	}
+}
