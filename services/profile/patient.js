@@ -30,4 +30,5 @@ module.exports.specificPatient = function(request,response) {
 		else
 			utils.httpResponse(response,404,'Patient not found')
 	});
+	
 }
