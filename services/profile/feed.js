@@ -5,6 +5,7 @@ var Validation = require(__base + 'services/database/model.js').Validation
 var Sample = require(__base + 'services/database/model.js').Sample
 var PetriDishSample = require(__base + 'services/database/model.js').PetriDishSample
 var ValidationSample = require(__base + 'services/database/model.js').ValidationSample
+var Patient= require(__base + 'services/database/model.js').Patient
 
 var uuid = require('node-uuid')
 var hashMap = require('hashmap')
@@ -18,6 +19,8 @@ var NOTIFICATION_OBJECT_ID = 'objectID'
 var NOTIFICATION_GERM_NAME = 'germName'
 var NOTIFICATION_GERM_CONFIDENCE = 'germConfidence'
 var NOTIFICATION_GERM_PATHOGEN_STATUS = 'germPathogenStatus'
+var NOTIFICATION_COMMENT = 'comment'
+var COLLAPSE_KEY_COMMENT = 'comment_key'
 var COLLAPSE_KEY_QUESTION = 'question_key'
 var COLLAPSE_KEY_VALIDATION = 'validation_key'
 
@@ -25,7 +28,6 @@ var COLLAPSE_KEY_VALIDATION = 'validation_key'
 module.exports.createQuestion = function(request,response) {
 	var question = new Question({
 		text : request.body.text,
-		date : request.body.date,
 		answered : false,
 		sample : request.body.sample
 	});
@@ -48,7 +50,6 @@ module.exports.createQuestion = function(request,response) {
 module.exports.createValidation = function(request,response) {
 	var validation = new Validation({
 		validateState : false,
-		date : request.body.date,
 		answered : false,
 		sample : request.body.sample	
 	});
@@ -79,7 +80,8 @@ module.exports.createValidation = function(request,response) {
 }
 
 module.exports.feedOverview = function(request,response) {
-	Feed.find({answered : false}, '-__v')
+	Feed.find({ $or:[{ $and:[{answered : false},{__t : "Question"}]}, { $and:[{$or:[{validateState : false},{answered : false}]},{__t : "Validation"}]} ]},'-__v -comments')
+			.sort({date: 'ascending'})
 			.populate('sample', 'specimenType environmentType result')
 			.exec(function(err, questions){
 				if (err){
@@ -92,7 +94,8 @@ module.exports.feedOverview = function(request,response) {
 }
 
 module.exports.questionOverview = function(request,response) {
-	Question.find({answered : false}, '-__v')
+	Question.find({answered : false}, '-__v -comments')
+			.sort({date: 'ascending'})
 			.populate('sample', 'specimenType environmentType')
 			.exec(function(err, questions){
 				if (err){
@@ -105,8 +108,9 @@ module.exports.questionOverview = function(request,response) {
 }
 
 module.exports.validationOverview = function(request,response) {
-	Validation.find({answered : false}, '-__v')
-			.populate('sample', 'specimenType environmentType result')
+	Validation.find({ $or:[{answered : false}, {validateState : false}] }, '-__v -comments')
+			.sort({date: 'ascending'})
+			.populate('sample', 'specimenType environmentType result')	
 			.exec(function(err, questions){
 				if (err){
 					utils.httpResponse(response,404,err)
@@ -118,7 +122,8 @@ module.exports.validationOverview = function(request,response) {
 }
 
 module.exports.questionHistory = function(request,response) {
-	Question.find({answered : true}, '-__v')
+	Question.find({answered : true}, '-__v -comments')
+			.sort({date: 'ascending'})
 			.populate('sample', 'specimenType environmentType')
 			.exec(function(err, questions){
 				if (err){
@@ -130,6 +135,23 @@ module.exports.questionHistory = function(request,response) {
 			})
 }
 
+module.exports.questionHistorySearch = function(request,response) {
+	Question.find({answered : true}, '-__v -comments')
+			.sort({date: 'ascending'})
+			.populate('sample', 'specimenType environmentType')
+			.exec(function(err, questions){
+				if (err){
+					utils.httpResponse(response,404,err)
+				} else{
+					function filterQuestion(question){
+						return (typeof request.query.environmentType === 'undefined' && typeof request.query.specimenType === 'undefined') || (question.sample.specimenType == request.query.specimenType && typeof request.query.environmentType === 'undefined') || (question.sample.environmentType == request.query.environmentType && typeof request.query.specimenType === 'undefined') || (question.sample.environmentType == request.query.environmentType && question.sample.specimenType == request.query.specimenType && typeof request.query.environmentType !== 'undefined' && typeof request.query.specimenType !== 'undefined');
+					}
+					var questionsFiltered = questions.filter(filterQuestion);
+					utils.httpResponse(response,200,'Questions successfully found',questionsFiltered)
+				}
+			})
+}
+
 module.exports.specificQuestion = function(request,response) {
 	Question.findById(mongoose.Types.ObjectId(request.query.questionId))
 		.populate('sample')
@@ -137,8 +159,7 @@ module.exports.specificQuestion = function(request,response) {
 		.exec(function(err, obj){
 			if(err){
 				utils.httpResponse(response,404,'Question not found')
-			}
-			else{
+			}else{
 				obj.sample.populate('patient', function(err){
 					if(err){
 						utils.httpResponse(response,500,'Internal error')
@@ -207,17 +228,38 @@ module.exports.answerValidation = function(request,response) {
 						validation.answered = true;			
 						validation.validateState = request.body.validateState;
 						
+						var currentDate = new Date();
+						
 						validation.comments.push({
-							date : request.body.date,
+							date : currentDate,
 							user : owner._id,
 							message : request.body.message	
 						});
+						refreshComment(validation._id);	
 						validation.save();
-						utils.httpResponse(response, 200, 'Validation successfully modified')
+						
+						if(validation.validateState){
+							validation.populate('sample', function(err){
+								if(err){
+									utils.httpResponse(response,500,'Internal error')
+								}else{
+									Patient.findById(validation.sample.patient,function(err, obj){
+										obj.results.push({
+											date : currentDate,
+											name : validation.sample.result.finalGerm.name,
+											pathogenStatus : validation.sample.result.finalGerm.pathogenStatus
+										})
+										obj.save();
+									});
+									utils.httpResponse(response,200,'Validation successfully answered',validation)
+								}
+							})
+						}else{
+							utils.httpResponse(response,200,'Validation successfully answered',validation)
+						}																
 					} else {
 						utils.httpResponse(response,500,err)
 					}
-
 				});				
 			} else{
 				utils.httpResponse(response, 404, 'Validation not found')
@@ -230,16 +272,19 @@ module.exports.commentQuestion = function(request,response) {
 	Question.findOne({_id: mongoose.Types.ObjectId(request.body.questionId)}, function (err, question) {
 		if(err){
 			utils.httpResponse(response,500,'Could not add comment')
-		} else {
+		}else {
 			if (question) {
 				User.findOne({token : request.session.userToken}, function(err,owner){
-					if(!err){				
+					if(!err){		
+						var commentDate = new Date();
+					
 						question.comments.push({
-							date : request.body.date,
+							date : commentDate,
 							user : owner._id,
 							message : request.body.message	
 						});
-						question.save();	
+						question.save();
+						refreshComment(question._id);						
 						utils.httpResponse(response,200,'Comment successfully added')
 					} else {
 						utils.httpResponse(response,500,err)
@@ -259,13 +304,16 @@ module.exports.commentValidation = function(request,response) {
 		} else {
 			if (validation) {
 				User.findOne({token : request.session.userToken}, function(err,owner){
-					if(!err){				
+					if(!err){		
+						var commentDate = new Date();	
+						
 						validation.comments.push({
-							date : request.body.date,
+							date : commentDate,
 							user : owner._id,
 							message : request.body.message	
 						});
 						validation.save();
+						refreshComment(validation._id);
 						utils.httpResponse(response, 200, 'Comment successfully added')
 					} else {
 						utils.httpResponse(response,500,err)
@@ -297,8 +345,17 @@ module.exports.getValidationComment = function(request,response) {
 			if(err){
 				utils.httpResponse(response,404,'Validation not found')
 			}else{
-				utils.httpResponse(response,200,'Validation comments successfully found',obj.comments)
+				utils.httpResponse(response,200,'Validation comments successfully found',obj.comments)			
 			}				
 		})
 }
+
+function refreshComment(id){
+	var hashmapMessage = new hashMap.HashMap()
+	hashmapMessage.set(NOTIFICATION_OBJECT_ID,id)
+	hashmapMessage.set(NOTIFICATION_COMMENT,id)
+	
+	notification.sendNotification(hashmapMessage, COLLAPSE_KEY_COMMENT)
+}
+
 

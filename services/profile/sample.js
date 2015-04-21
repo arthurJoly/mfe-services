@@ -9,14 +9,13 @@ var mongoose = require(__base + 'services/database/database.js').mongoose
 
 
 module.exports.createPetriDishSample = function(request,response) {
-	//TODO : change the way we get the patient id
 	Patient.find({}, function(err, patients){
 		var petriDishSample = new PetriDishSample({
 			specimenType : request.body.specimenType,
 			environmentType : request.body.environmentType,
 			isolates : request.body.isolates,
 			image : request.body.image,
-			patient : patients[patients.length-1]._id
+			patient : request.body.patient
 		});
 
 		petriDishSample.save(function(err) {
@@ -29,13 +28,12 @@ module.exports.createPetriDishSample = function(request,response) {
 }
 
 module.exports.createValidationSample = function(request,response) {
-	//TODO : change the way we get the patient id
 	Patient.find({}, function(err, patients){
 		var validationSample = new ValidationSample({
 			specimenType : request.body.specimenType,
 			environmentType : request.body.environmentType,
 			result : request.body.result,
-			patient : patients[patients.length-1]._id
+			patient : request.body.patient
 		});
 
 		validationSample.save(function(err) {
@@ -59,10 +57,10 @@ module.exports.specificPetriDishSample = function(request,response) {
 }
 
 module.exports.sampleOverview = function(request,response) {
-	 Sample.find({},'-isolates -image -result -patient -__v',function(err, questions){
+	 Sample.find({},'-isolates -image -result -patient -__v',function(err, samples){
 		if (err)
 			utils.httpResponse(response,404,err)
 		else
-			utils.httpResponse(response,200,'Samples successfully found',questions)
+			utils.httpResponse(response,200,'Samples successfully found',samples)
 	});
 }

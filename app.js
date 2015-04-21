@@ -5,12 +5,10 @@ global.__base = __dirname + '/'
 bunyan = require('bunyan');
 log = bunyan.createLogger({
 	name: 'mfe_webservices',
-	streams: [
-	{
+	streams: [{
 		stream: process.stdout ,
 		level: 'trace'
-	}
-	]
+	}]
 });
 
 /**
@@ -44,6 +42,7 @@ app.use(express.static(__dirname + '/public'))
 app.listen(app.get('port'), function() {
 	console.log("Node app is running at localhost:" + app.get('port'))
 })
+
 
 /**
 * Local modules

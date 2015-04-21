@@ -1,4 +1,5 @@
 var app = require(__base + 'app.js').app
+var restrict = require(__base + 'services/utils/utils.js').restrict
 
 var user = require(__base + 'services/profile/user.js')
 var feed = require(__base + 'services/profile/feed.js')
@@ -70,6 +71,14 @@ app.post('/notification/registration/create', function(request, response) {
 //---------------------------------------------
 //------------------- GET ---------------------
 //---------------------------------------------
+
+/**
+ * Logout an user
+ */
+app.get('/user/logout', restrict, function(request, response) {
+    user.logoutUser(request,response);
+})
+
 /**
 * Get all feeds
 */
@@ -106,6 +115,13 @@ app.get('/question/history', function(request, response) {
 })
 
 /**
+* Get questions that have been answered given some criteria
+*/
+app.get('/question/history/search', function(request, response) {
+	feed.questionHistorySearch(request,response);
+})
+
+/**
 * Get specific question
 */
 app.get('/question/specific', function(request, response) {
@@ -124,6 +140,13 @@ app.get('/validation/specific', function(request, response) {
 */
 app.get('/sample/petridish/specific', function(request, response) {
 	sample.specificPetriDishSample(request,response);
+})
+
+/**
+* Get all patient
+*/
+app.get('/patient/overview', function(request, response) {
+	patient.patientOverview(request,response);
 })
 
 /**
