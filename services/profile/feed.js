@@ -8,6 +8,7 @@ var ValidationSample = require(__base + 'services/database/model.js').Validation
 var Patient= require(__base + 'services/database/model.js').Patient
 
 var uuid = require('node-uuid')
+var async = require('async')
 var hashMap = require('hashmap')
 var utils = require(__base + 'services/utils/utils.js')
 var notification = require(__base + 'services/utils/notification.js')
@@ -138,16 +139,38 @@ module.exports.questionHistory = function(request,response) {
 module.exports.questionHistorySearch = function(request,response) {
 	Question.find({answered : true}, '-__v -comments')
 			.sort({date: 'ascending'})
-			.populate('sample', 'specimenType environmentType')
+			.populate('sample', 'specimenType environmentType patient')
+			.populate('sample.patient')
 			.exec(function(err, questions){
 				if (err){
 					utils.httpResponse(response,404,err)
-				} else{
-					function filterQuestion(question){
-						return (typeof request.query.environmentType === 'undefined' && typeof request.query.specimenType === 'undefined') || (question.sample.specimenType == request.query.specimenType && typeof request.query.environmentType === 'undefined') || (question.sample.environmentType == request.query.environmentType && typeof request.query.specimenType === 'undefined') || (question.sample.environmentType == request.query.environmentType && question.sample.specimenType == request.query.specimenType && typeof request.query.environmentType !== 'undefined' && typeof request.query.specimenType !== 'undefined');
-					}
-					var questionsFiltered = questions.filter(filterQuestion);
-					utils.httpResponse(response,200,'Questions successfully found',questionsFiltered)
+				} else{	
+					//Call asyn each in order to wait for the population to be complete before returning the questions to the client
+					async.each(questions, function(aQuestion, callback){
+						Sample.populate(aQuestion.sample, 'patient', function(err){
+							callback();
+						})
+					}, function(err){
+						function filterQuestionOnSample(question){
+							return (typeof request.query.environmentType === 'undefined' && typeof request.query.specimenType === 'undefined') 
+									|| (question.sample.specimenType == request.query.specimenType && typeof request.query.environmentType === 'undefined') 
+									|| (question.sample.environmentType == request.query.environmentType && typeof request.query.specimenType === 'undefined') 
+									|| (question.sample.environmentType == request.query.environmentType && question.sample.specimenType == request.query.specimenType && typeof request.query.environmentType !== 'undefined' && typeof request.query.specimenType !== 'undefined');
+						}
+						var questionsFilteredOnSample = questions.filter(filterQuestionOnSample);
+						
+						function filterQuestionOnPatient(question){
+							return (typeof request.query.sex === 'undefined' && typeof request.query.age === 'undefined')
+									|| (question.sample.patient.sex == request.query.sex && typeof request.query.age === 'undefined')
+									|| (question.sample.patient.age == request.query.age && typeof request.query.sex === 'undefined')
+									|| (question.sample.patient.age == request.query.age && question.sample.patient.sex == request.query.sex);
+						}
+						
+						var questionsFiltered = questionsFilteredOnSample.filter(filterQuestionOnPatient);
+						
+						utils.httpResponse(response,200,'Questions successfully found',questionsFiltered)
+					})
+					
 				}
 			})
 }
