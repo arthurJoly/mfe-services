@@ -8,6 +8,8 @@ var mongoose = require(__base + 'services/database/database.js').mongoose
 
 module.exports.createPatient = function(request,response) {
 	var patient = new Patient({
+			firstname : request.body.firstname,
+			lastname : request.body.lastname,
 			age : request.body.age,
 			sex : request.body.sex,
 			size : request.body.size,
@@ -23,7 +25,7 @@ module.exports.createPatient = function(request,response) {
 }
 
 module.exports.patientOverview = function(request,response) {
-	 Patient.find({},'-__v',function(err, patients){
+	Patient.find({},'-__v -results',function(err, patients){
 		if (err)
 			utils.httpResponse(response,404,err)
 		else
@@ -37,5 +39,30 @@ module.exports.specificPatient = function(request,response) {
 			utils.httpResponse(response,200,'Patient successfully found',obj)
 		else
 			utils.httpResponse(response,404,'Patient not found')
+	});
+}
+
+module.exports.patientSearch = function(request,response) {
+	if (typeof String.prototype.startsWith != 'function') {
+		String.prototype.startsWith = function (str){
+			return this.slice(0, str.length) == str;
+		};
+	}
+	
+	Patient.find({},'-__v -results',function(err, patients){
+		if (err){
+			utils.httpResponse(response,404,err)
+		}else{
+			function filterPatient(patient){
+				return (patient.firstname.toLowerCase().startsWith(request.query.query.toLowerCase()) 
+				|| patient.lastname.toLowerCase().startsWith(request.query.query.toLowerCase()) 
+				|| patient.age.toString().toLowerCase().startsWith(request.query.query.toLowerCase())
+				|| patient.size.toString().toLowerCase().startsWith(request.query.query.toLowerCase())
+				|| patient.weight.toString().toLowerCase().startsWith(request.query.query.toLowerCase())
+				|| patient._id.toString().toLowerCase().startsWith(request.query.query.toLowerCase()));				
+			}
+			var patientsFiltered = patients.filter(filterPatient);
+			utils.httpResponse(response,200,'Patients successfully found',patientsFiltered)
+		}
 	});
 }
