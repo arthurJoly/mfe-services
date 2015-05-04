@@ -19,9 +19,9 @@ module.exports.createPetriDishSample = function(request,response) {
 
 	petriDishSample.save(function(err) {
 		if (err)
-			utils.httpResponse(response,500,err)
+			utils.httpResponse(false,response,500,err)
 		else
-			utils.httpResponse(response,200,'Sample successfully created')
+			utils.httpResponse(false,response,200,'Sample successfully created')
 	});
 }
 
@@ -35,18 +35,27 @@ module.exports.createValidationSample = function(request,response) {
 
 	validationSample.save(function(err) {
 		if (err)
-			utils.httpResponse(response,500,err)
+			utils.httpResponse(false,response,500,err)
 		else
-			utils.httpResponse(response,200,'Sample successfully created')
+			utils.httpResponse(false,response,200,'Sample successfully created')
 	});
 }
 
 module.exports.sampleOverview = function(request,response) {
 	 Sample.find({},'-isolates -image -result -patient -__v',function(err, samples){
-		if (err)
-			utils.httpResponse(response,404,err)
-		else
-			utils.httpResponse(response,200,'Samples successfully found',samples)
+		if(typeof request.query.callback === 'undefined'){
+			if (err){
+				utils.httpResponse(false,response,404,err)
+			}else{
+				utils.httpResponse(false,response,200,'Samples successfully found',samples)
+			}
+		}else{
+			if (err){
+				utils.httpResponse(true,response,404,err)
+			}else{
+				utils.httpResponse(true,response,200,'Samples successfully found',samples)
+			}
+		}
 	});
 }
 
@@ -55,9 +64,9 @@ module.exports.specificPetriDishSample = function(request,response) {
 		.populate('patient')
 		.exec(function(err,obj){
 			if (obj)
-				utils.httpResponse(response,200,'Sample successfully found',obj)
+				utils.httpResponse(false,response,200,'Sample successfully found',obj)
 			else
-				utils.httpResponse(response,404,'Sample not found')
+				utils.httpResponse(false,response,404,'Sample not found')
 		});
 }
 
@@ -66,9 +75,9 @@ module.exports.specificValidationSample = function(request,response) {
 		.populate('patient')
 		.exec(function(err,obj){
 			if (obj)
-				utils.httpResponse(response,200,'Sample successfully found',obj)
+				utils.httpResponse(false,response,200,'Sample successfully found',obj)
 			else
-				utils.httpResponse(response,404,'Sample not found')
+				utils.httpResponse(false,response,404,'Sample not found')
 		});
 }
 
@@ -78,25 +87,18 @@ module.exports.sampleSearch = function(request,response) {
 			return this.slice(0, str.length) == str;
 		};
 	}
-	/*Sample.find({$or:[{specimenType : request.query.specimenType},{environmentType : request.query.environmentType}]},'-__v -patient',function(err, samples){
-		if (err){
-			utils.httpResponse(response,404,err)
-		}else{
-			utils.httpResponse(response,200,'Samples successfully found',samples)
-		}
-	});*/
-	
+
 	Sample.find({},'-__v -patient',function(err, samples){
 		if (err){
-			utils.httpResponse(response,404,err)
+			utils.httpResponse(false,response,404,err)
 		}else{
 			function filterSample(sample){
-				return (sample.specimenType == request.query.specimenType
-				|| sample.environmentType == request.query.environmentType
-				|| sample._id.toString().toLowerCase().startsWith(request.query.query.toLowerCase()));				
+				return (sample.specimenType.toString() == request.query.specimenType
+				|| sample.environmentType.toString() == request.query.environmentType
+				|| (sample._id.toString().toLowerCase().startsWith(request.query.query.toLowerCase()) && typeof request.query.query !== 'undefined'))				
 			}
 			var samplesFiltered = samples.filter(filterSample);
-			utils.httpResponse(response,200,'Samples successfully found',samplesFiltered)
+			utils.httpResponse(false,response,200,'Samples successfully found',samplesFiltered)
 		}
 	});
 }
