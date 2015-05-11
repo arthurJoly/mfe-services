@@ -2,7 +2,8 @@
 
 Webservices REST for the application Myla For Experts
 
-This server is deployed on Heroku and the web services can be access with https://mylaforexperts-services.herokuapp.com
+This server is deployed on Heroku 
+and the web services can be access with https://mylaforexperts-services.herokuapp.com
 
 # Get ready as a contributor
 
